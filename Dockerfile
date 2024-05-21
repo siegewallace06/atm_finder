@@ -1,26 +1,27 @@
-# Base image
-FROM node:20.9.0-alpine
+# Stage 1: Build the application
+FROM node:20.9.0-alpine AS builder
 
-# Optional NPM automation (auth) token build argument
-# ARG NPM_TOKEN
+WORKDIR /usr/src/app
 
-# Optionally authenticate NPM registry
-# RUN yarn config set npmAuthToken ${NPM_TOKEN}
-
-WORKDIR /app
-
-# Copy configuration files
-COPY tsconfig*.json ./
 COPY package.json yarn.lock ./
-
-# Install dependencies using Yarn
 RUN yarn install --frozen-lockfile
 
-# Copy application sources (.ts, .tsx, js)
-COPY src/ src/
+COPY . .
+RUN yarn build
 
-# Expose application port
-EXPOSE 3000
+# Stage 2: Create the production-ready image
+FROM node:20.9.0-alpine AS production
 
-# Start application in development mode
+WORKDIR /usr/src/app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /usr/src/app/package.json /usr/src/app/yarn.lock ./
+RUN yarn install --frozen-lockfile --production
+
+COPY --from=builder /usr/src/app/dist ./dist
+
+USER node
+
 CMD [ "yarn", "start:dev" ]
+# Nothing is True, Everything is Permitted III
